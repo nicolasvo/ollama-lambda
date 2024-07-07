@@ -40,7 +40,7 @@ def query_ollama(prompt):
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
-            json={"model": "gemma:7b", "prompt": prompt, "stream": False},
+            json={"model": "tinyllama:1.1b", "prompt": prompt, "stream": False},
             timeout=300,
         )
         return response.json()
@@ -60,6 +60,7 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event["body"])
         prompt = body.get("prompt", "")
+        print(prompt)
         result = query_ollama(prompt)
 
         return {"statusCode": 200, "body": json.dumps(result)}
