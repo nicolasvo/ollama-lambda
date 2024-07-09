@@ -1,3 +1,4 @@
 *.tfvars
 *.terraform*
 .DS_Store
+Pipfile.lock

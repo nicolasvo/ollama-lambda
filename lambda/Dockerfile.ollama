@@ -1,9 +1,23 @@
 FROM ollama/ollama
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
 
-RUN mkdir -p /root/.ollama/models
-COPY models /root/.ollama/models/
+ARG MODEL="tinyllama:1.1b"
 
+ENV AWS_LWA_INVOKE_MODE=response_stream
+ENV AWS_LWA_PORT=11434
 ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_MODELS=/ollama/models/
+ENV OLLAMA_RUNNERS_DIR=/tmp/
+ENV OLLAMA_NOHISTORY=False
+ENV HOME=/tmp/
+ENV MODEL=${MODEL}
+
+RUN mkdir -p /ollama/models
+
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull ${MODEL}
+
 EXPOSE 11434
 
 ENTRYPOINT ["ollama"]

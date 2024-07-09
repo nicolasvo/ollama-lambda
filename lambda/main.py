@@ -1,11 +1,18 @@
-import json
-import subprocess
-import time
-import threading
-import requests
 import ollama
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+import uvicorn
+import requests
+import subprocess
+import threading
+import json
+import os
+import time
+
+app = FastAPI()
 
 ollama_process = None
+model = os.getenv("MODEL")
 
 
 def log_process_output(process):
@@ -65,27 +72,36 @@ def start_ollama():
     return False
 
 
-def query_ollama(prompt):
-    try:
-        response = ollama.generate(model="gemma:7b", prompt=prompt)
-        return response["response"]
-    except Exception as e:
-        print(f"Error querying Ollama: {e}")
-        return {"error": str(e)}
-
-
-def lambda_handler(event, context):
+# Define the streaming endpoint
+@app.post("/generate")
+async def stream_response(request: Request):
     if not check_ollama_running():
         if not start_ollama():
             return {
                 "statusCode": 500,
                 "body": json.dumps("Failed to start Ollama server"),
             }
-
     try:
-        body = json.loads(event["body"])
+        body = await request.json()
         prompt = body.get("prompt", "")
-        result = query_ollama(prompt)
-        return {"statusCode": 200, "body": json.dumps(result)}
+        stream = body.get("stream", False)
+
+        if stream:
+            # Assuming ollama.generate returns a regular generator
+            def response_generator():
+                for item in ollama.generate(model=model, prompt=prompt, stream=True):
+                    yield str(item.get("response", ""))
+
+            return StreamingResponse(response_generator(), media_type="text/plain")
+        else:
+            response = ollama.generate(model=model, prompt=prompt)
+            return StreamingResponse(response["response"], media_type="text/plain")
+
     except Exception as e:
         return {"statusCode": 500, "body": json.dumps(f"Error: {str(e)}")}
+
+
+# Run the application using: uvicorn main:app --reload
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))

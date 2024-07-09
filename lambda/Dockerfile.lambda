@@ -1,11 +1,28 @@
-FROM amazon/aws-lambda-python:3.11
+FROM public.ecr.aws/docker/library/python:3.12.0-slim-bullseye
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
 
-RUN mkdir -p /root/.ollama/models
-COPY models /root/.ollama/models/
-COPY lambda_function.py ${LAMBDA_TASK_ROOT}
-RUN pip install ollama requests
-RUN curl -fsSL https://ollama.com/install.sh | sh
+ARG MODEL="tinyllama:1.1b"
 
+ENV AWS_LWA_INVOKE_MODE=response_stream
+ENV AWS_LWA_PORT=8080
 ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_MODELS=/ollama/models/
+ENV OLLAMA_RUNNERS_DIR=/tmp/
+ENV OLLAMA_NOHISTORY=False
+ENV HOME=/tmp/
+ENV MODEL=${MODEL}
 
-CMD [ "lambda_function.lambda_handler" ]
+RUN mkdir -p /ollama/models
+RUN apt update && apt install -y curl
+RUN curl -fsSL https://ollama.com/install.sh | sh
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull ${MODEL}
+
+WORKDIR /app
+COPY main.py .
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENTRYPOINT ["python"]
+CMD ["main.py"]
